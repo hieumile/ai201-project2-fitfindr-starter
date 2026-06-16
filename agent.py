@@ -18,6 +18,8 @@ Usage (once implemented):
     print(result["error"])   # None on success
 """
 
+import re
+
 from tools import search_listings, suggest_outfit, create_fit_card
 
 
@@ -92,9 +94,73 @@ def run_agent(query: str, wardrobe: dict) -> dict:
     Before writing code, complete the Planning Loop and State Management sections
     of planning.md — your implementation should match what you described there.
     """
-    # TODO: implement the planning loop
+    # Step 1: initialise session
     session = _new_session(query, wardrobe)
-    session["error"] = "Planning loop not yet implemented."
+
+    # Step 2: parse query — extract description, size, max_price via regex
+    text = query.lower()
+
+    # Require a keyword (under/max/below/up to) OR an explicit $ — bare numbers don't count
+    price_match = re.search(
+        r"(?:under|max|below|up to)\s*\$?(\d+(?:\.\d+)?)"   # keyword-prefixed price
+        r"|\$(\d+(?:\.\d+)?)",                                # explicit $ sign
+        text,
+    )
+    if price_match:
+        max_price = float(price_match.group(1) or price_match.group(2))
+    else:
+        max_price = None
+
+    size_match = re.search(
+        r"\bsize\s+([a-z0-9/]+)\b"                      # "size M", "size S/M"
+        r"|(?<!['\w])(xxs|xs|s/m|m/l|xxl|xl|s|m|l)(?!['\w])",  # bare size, not inside a word
+        text,
+    )
+    if size_match:
+        size = (size_match.group(1) or size_match.group(2)).upper()
+    else:
+        size = None
+
+    # Strip price and size tokens to get the core description
+    description = re.sub(r"(?:under|max|below|up to)\s*\$?\d+(?:\.\d+)?", "", text)
+    description = re.sub(r"\$\d+(?:\.\d+)?", "", description)
+    description = re.sub(r"\bsize\s+[a-z0-9/]+\b", "", description)
+    description = re.sub(r"(?<!['\w])(xxs|xs|s/m|m/l|xxl|xl|s|m|l)(?!['\w])", "", description)
+    description = re.sub(r"[,\s]+", " ", description).strip()
+
+    session["parsed"] = {
+        "description": description,
+        "size": size,
+        "max_price": max_price,
+    }
+
+    # Step 3: call search_listings — branch on result
+    result = search_listings(description, size=size, max_price=max_price)
+    session["search_results"] = [result] if result else []
+
+    if result is None:
+        session["error"] = (
+            "No listings matched your search. "
+            "Try different keywords, a larger budget, or a different size."
+        )
+        return session
+
+    # Step 4: selected item is the top (and only) result from search_listings
+    session["selected_item"] = result
+
+    # Step 5: call suggest_outfit with selected item and wardrobe
+    session["outfit_suggestion"] = suggest_outfit(
+        session["selected_item"],
+        session["wardrobe"],
+    )
+
+    # Step 6: call create_fit_card with outfit suggestion and selected item
+    session["fit_card"] = create_fit_card(
+        session["outfit_suggestion"],
+        session["selected_item"],
+    )
+
+    # Step 7: return completed session
     return session
 
 

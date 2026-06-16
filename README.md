@@ -52,6 +52,30 @@ from utils.data_loader import get_example_wardrobe
 wardrobe = get_example_wardrobe()
 ```
 
+## AI Usage
+
+This project used Claude (Anthropic, via Cowork) as the primary AI tool throughout implementation.
+
+### Instance 1 — Implementing `search_listings`
+
+**Input given to Claude:** The Tool 1 spec from `planning.md` (inputs, return value, failure mode), the `search_listings` stub from `tools.py`, and the `load_listings()` signature from `utils/data_loader.py`.
+
+**What it produced:** A complete implementation that loaded listings, filtered by price and size using list comprehensions, scored each listing by keyword overlap across title/description/style_tags/colors, dropped zero-score results, and returned a sorted list of matching dicts.
+
+**What I changed:** The generated code returned a `list[dict]` of all matches. I overrode this to return a single `dict | None` — just the top result — since the agent only ever uses the best match and passing a list created unnecessary indexing (`results[0]`) downstream. I also removed `id`, `brand`, and `platform` from the returned dict to match only the 8 fields specified in `planning.md`.
+
+---
+
+### Instance 2 — Implementing `run_agent` (planning loop)
+
+**Input given to Claude:** The full Planning Loop and State Management sections from `planning.md`, the Architecture Mermaid diagram, the `_new_session()` dict definition, and the numbered TODO steps inside `run_agent()` in `agent.py`.
+
+**What it produced:** A planning loop that initialized the session, parsed the query with regex, called `search_listings`, branched on the result, and conditionally called `suggest_outfit` and `create_fit_card` — storing each output in the session dict before proceeding.
+
+**What I changed:** The generated price regex (`r"(?:under|max|below|up to)?\s*\$?(\d+(?:\.\d+)?)"`) matched bare numbers without a `$` or keyword, so `"90s track jacket"` was parsed as `max_price=90.0` and `"size 8"` produced `max_price=8.0`. I rewrote the regex to require either an explicit `$` sign or a keyword prefix (`under`, `max`, `below`, `up to`) before treating a number as a price. I also added a fix for the size regex, which was matching the `m` in `"I'm"` as size M by using lookahead/lookbehind to exclude apostrophe-adjacent matches.
+
+---
+
 ## Where to Start
 
 1. **Read `planning.md` and fill it out before writing any code.**
