@@ -26,7 +26,7 @@ It takes in details about the clothes user, searches the mock listings dataset a
 
 **What it returns:**
 <!-- Describe the return value — what fields does a result contain? -->
-It returns the matched items in, including the fields: title, description, category, style tags, size, condition, price and color.
+It returns the most matched item with the details input, including the fields: title, description, category, style tags, size, condition, price and color.
 
 
 **What happens if it fails or returns nothing:**
